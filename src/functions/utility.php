@@ -1,40 +1,22 @@
 <?php
 
-if (!function_exists('getallheaders')) {
+/**
+ * 多维数组压缩为一维
+ * @param $array 原始数据
+ * @param string $prefix 前缀
+ * @return array
+ */
+function lar_array_dot(array $array, string $prefix = '') : array
+{
+    $results = [];
 
-    function getallheaders()
-    {
-        $headers = array();
-        $copy_server = array(
-            'CONTENT_TYPE'   => 'Content-Type',
-            'CONTENT_LENGTH' => 'Content-Length',
-            'CONTENT_MD5'    => 'Content-Md5',
-        );
-        foreach ($_SERVER as $key => $value) {
-            if (substr($key, 0, 5) === 'HTTP_') {
-                $key = substr($key, 5);
-                if (!isset($copy_server[$key]) || !isset($_SERVER[$key])) {
-                    $key = str_replace(
-                        ' ',
-                        '-',
-                        ucwords(strtolower(str_replace('_', ' ', $key)))
-                    );
-                    $headers[$key] = $value;
-                }
-            } elseif (isset($copy_server[$key])) {
-                $headers[$copy_server[$key]] = $value;
-            }
+    foreach ($array as $key => $value) {
+        if (is_array($value) && ! empty($value)) {
+            $results = array_merge($results, lar_array_dot($value, $prefix . $key . '.'));
+        } else {
+            $results[$prefix . $key] = $value;
         }
-        if (!isset($headers['Authorization'])) {
-            if (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-                $headers['Authorization'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-            } elseif (isset($_SERVER['PHP_AUTH_USER'])) {
-                $auth_pw = isset($_SERVER['PHP_AUTH_PW']) ? $_SERVER['PHP_AUTH_PW'] : '';
-                $headers['Authorization'] = 'Basic ' . base64_encode($_SERVER['PHP_AUTH_USER'] . ':' . $auth_pw);
-            } elseif (isset($_SERVER['PHP_AUTH_DIGEST'])) {
-                $headers['Authorization'] = $_SERVER['PHP_AUTH_DIGEST'];
-            }
-        }
-        return $headers;
     }
+
+    return $results;
 }
