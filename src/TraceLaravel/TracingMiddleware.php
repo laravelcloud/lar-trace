@@ -1,9 +1,10 @@
 <?php
-namespace LaravelCloud\Trace\Middleware;
+
+namespace LaravelCloud\Trace\TraceLaravel;
 
 use Closure;
 use Illuminate\Contracts\Foundation\Application;
-use LaravelCloud\Trace\Services\TracingService;
+use Illuminate\Support\Arr;
 use Zipkin\Endpoint;
 use Zipkin\Propagation\DefaultSamplingFlags;
 use Zipkin\Reporters\Http;
@@ -36,25 +37,25 @@ class TracingMiddleware
      */
     public function handle($request, Closure $next)
     {
-        $rate           = config('trace.trace_rate');
-        $endpointUrl    = config('trace.trace_endpoint_url');
-        $serviceName    = config('trace.trace_service_name');
+        $rate = config('trace.rate');
+        $endpointUrl = config('trace.endpoint_url');
+        $serviceName = config('trace.service_name');
 
-        $uri        = $request->getRequestUri();
-        $query      = $request->query->all();
-        $method     = $request->getMethod();
-        $headers    = $request->headers->all() ?: [];
-        $httpHost   = $request->getHttpHost();
-        $spanId     = $request->header('X-B3-SpanId') ?? null;
-        $name       = "{$method} {$uri}";
+        $uri = $request->getRequestUri();
+        $query = $request->query->all();
+        $method = $request->getMethod();
+        $headers = $request->headers->all() ?: [];
+        $httpHost = $request->getHttpHost();
+        $spanId = $request->header('X-B3-SpanId') ?? null;
+        $name = "{$method} {$uri}";
 
         $carrier = array_map(function ($header) {
             return $header[0];
         }, $headers);
 
-        $sampler    = PercentageSampler::create($rate);
-        $endpoint   = Endpoint::create($serviceName);
-        $reporter   = new Http(Http\CurlFactory::create(), [
+        $sampler = PercentageSampler::create($rate);
+        $endpoint = Endpoint::create($serviceName);
+        $reporter = new Http(Http\CurlFactory::create(), [
             'endpoint_url' => $endpointUrl
         ]);
 
@@ -84,7 +85,7 @@ class TracingMiddleware
         $span->tag('http.env', $this->app->environment());
 
         if (!empty($query) && is_array($query)) {
-            $queryParams = lar_array_dot($query, 'http.query.');
+            $queryParams = Arr::dot($query, 'http.query.');
 
             foreach ($queryParams as $k => $v) {
                 $span->tag($k, $v);
@@ -101,8 +102,7 @@ class TracingMiddleware
      */
     public function terminate($request, $response)
     {
-        $service = $this->app->make(TracingService::class);
-        $tracer = $service->getTracing()->getTracer();
+        $tracer = app('trace')->getTracer();
 
         $span = $tracer->getCurrentSpan();
         $span->annotate('request_finished', \Zipkin\Timestamp\now());
@@ -115,5 +115,4 @@ class TracingMiddleware
 
         $tracer->flush();
     }
-
 }
