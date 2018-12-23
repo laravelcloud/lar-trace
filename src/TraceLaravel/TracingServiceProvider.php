@@ -2,10 +2,8 @@
 
 namespace LaravelCloud\Trace\TraceLaravel;
 
-use Illuminate\Http\Request;
 use Illuminate\Support\ServiceProvider;
 use LaravelCloud\Trace\Trace\TracingService;
-use Zipkin\Recording\Span;
 
 /**
  * Class TracingServiceProvider
@@ -31,7 +29,6 @@ class TracingServiceProvider extends ServiceProvider
 
     /**
      * Bootstrap the application events.
-     * @var Span $span
      */
     public function boot()
     {
@@ -40,23 +37,14 @@ class TracingServiceProvider extends ServiceProvider
             __DIR__ . '/../../../config/trace.php' => config_path(static::$abstract . '.php'),
         ), 'config');
 
-        $name   = config('app.name') ?: '';
-
-        /**
-         * @var Span $span
-         */
-        $span = app(self::$globalSpanAbstract);
-        $span->start(\Zipkin\Timestamp\now());
-        $span->setName($name);
-        $span->setKind(\Zipkin\Kind\SERVER);
-        $span->annotate(\Zipkin\Timestamp\now(), 'request_started');
-        $span->tag('http.type', app()->runningInConsole() ? 'console' : 'http-request');
-        $span->tag('http.env',  app()->environment());
-
         app()->terminating(function () {
-            app(self::$globalSpanAbstract)->annotate('request_finished', \Zipkin\Timestamp\now());
-            app(self::$globalSpanAbstract)->finish();
-            app(self::$abstract)->flush();
+            /**
+             * @var TracingService $service
+             */
+            $service = app(TracingService::class);
+            $service->getGlobalSpan()->annotate('request_finished', \Zipkin\Timestamp\now());
+            $service->getGlobalSpan()->finish();
+            $service->getTracing()->getTracer()->flush();
         });
     }
 
@@ -90,16 +78,11 @@ class TracingServiceProvider extends ServiceProvider
             return $header[0];
         }, (array)request()->headers);
 
-        $tracingService = new TracingService();
-        $tracingService->createTracing(config(static::$abstract));
-        $tracingService->createGlobalSpan($carrier);
-
-        $this->app->singleton(self::$abstract, function () use ($tracingService) {
-            return $tracingService->getTracing();
-        });
-
-        $this->app->singleton(self::$globalSpanAbstract, function() use ($tracingService) {
-            return $tracingService->getGlobalSpan();
+        $this->app->singleton(TracingService::class, function () use ($carrier) {
+            $tracingService = new TracingService();
+            $tracingService->createTracing(config(static::$abstract));
+            $tracingService->createGlobalSpan($carrier);
+            return $tracingService;
         });
     }
 

@@ -78,8 +78,7 @@ class TracingService
         $childSpan->setKind(\Zipkin\Kind\CLIENT);
         $childSpan->setName($name);
 
-        foreach ((array)$tags as $key => $tag)
-        {
+        foreach ((array)$tags as $key => $tag) {
             $childSpan->tag($key, (string)$tag);
         }
 
@@ -88,6 +87,6 @@ class TracingService
 
     public function record($payload)
     {
-
+        return;
     }
 }
