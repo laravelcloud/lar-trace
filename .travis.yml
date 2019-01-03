@@ -4,6 +4,6 @@ php:
 before_script:
   - composer install --dev
   - composer phpcs
-  - composer tests
+  - composer dump-autoload
   - composer tests-travis
   - composer tests-report
