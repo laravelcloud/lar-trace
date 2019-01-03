@@ -1,7 +1,7 @@
 <?php
 namespace LaravelCloud\TraceTests\Trace;
 
-class TracingServiceProviderTest
+class TracingServiceProviderTest extends \Orchestra\Testbench\TestCase
 {
     public function testIsBound()
     {
