@@ -3,3 +3,7 @@ php:
   - 7.1
 before_script:
   - composer install --dev
+  - composer phpcs
+  - composer tests
+  - composer tests-travis
+  - composer tests-report

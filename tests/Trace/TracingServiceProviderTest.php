@@ -1,4 +1,5 @@
 <?php
+namespace LaravelCloud\TraceTests\Trace;
 
 class TracingServiceProviderTest
 {

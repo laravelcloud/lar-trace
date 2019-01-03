@@ -25,6 +25,11 @@
             "LaravelCloud\\Trace\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "LaravelCloud\\TraceTests\\": "tests/"
+        }
+    },
     "minimum-stability": "stable",
     "scripts": {
         "tests": ["vendor/bin/phpunit --verbose"],
