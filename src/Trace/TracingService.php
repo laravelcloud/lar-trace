@@ -84,9 +84,4 @@ class TracingService
 
         return $childSpan;
     }
-
-    public function record($payload)
-    {
-        return;
-    }
 }
