@@ -1,18 +1,10 @@
 <?php
+namespace LaravelCloud\TraceTests\Trace;
 
-class TracingServiceProviderTest
+class TracingServiceProviderTest extends \Orchestra\Testbench\TestCase
 {
-    public function testIsBound()
+    public function testTrue()
     {
-        $this->assertEquals(app()->bound('trace'), true);
+        $this->assertEquals(true, true);
     }
-
-    /**
-     * @depends testIsBound
-     */
-    public function testEnvironment()
-    {
-        $this->assertEquals(app('trace')->environment, 'testing');
-    }
-
 }
