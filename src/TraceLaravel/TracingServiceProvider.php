@@ -2,6 +2,7 @@
 
 namespace LaravelCloud\Trace\TraceLaravel;
 
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use LaravelCloud\Trace\Trace\TracingService;
 
@@ -34,17 +35,20 @@ class TracingServiceProvider extends ServiceProvider
     {
         // Publish the configuration file
         $this->publishes(array(
-            __DIR__ . '/../../../config/trace.php' => config_path(static::$abstract . '.php'),
+            __DIR__ . '/../../config/trace.php' => config_path(static::$abstract . '.php'),
         ), 'config');
 
-        app()->terminating(function () {
+        $service = app(TracingService::class);
+
+        app()->terminating(function () use ($service) {
             /**
              * @var TracingService $service
              */
-            $service = app(TracingService::class);
             $service->getGlobalSpan()->annotate('request_finished', \Zipkin\Timestamp\now());
             $service->getGlobalSpan()->finish();
             $service->getTracing()->getTracer()->flush();
+
+            Log::info("end tracing");
         });
     }
 
@@ -58,11 +62,6 @@ class TracingServiceProvider extends ServiceProvider
         $handler = new TracingEventHandler(config(static::$abstract));
 
         $handler->subscribe($app->events);
-
-        // In Laravel >=5.3 we can get the user context from the auth events
-        if (version_compare($app::VERSION, '5.5') >= 0) {
-            $handler->subscribeAuthEvents($app->events);
-        }
     }
 
     /**
@@ -72,10 +71,10 @@ class TracingServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->mergeConfigFrom(__DIR__ . '/../../../config/trace.php', static::$abstract);
+        $this->mergeConfigFrom(__DIR__ . '/../../config/trace.php', static::$abstract);
 
         $carrier = array_map(function ($header) {
-            return $header[0];
+            return $header[0] ?? null;
         }, (array)request()->headers);
 
         $this->app->singleton(TracingService::class, function () use ($carrier) {

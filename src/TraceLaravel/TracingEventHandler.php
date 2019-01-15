@@ -81,8 +81,12 @@ class TracingEventHandler
      */
     public function __call($method, $arguments)
     {
+        if(!$method) {
+            return null;
+        }
+
         try {
-            call_user_func_array(array($this, $method . 'handler'), $arguments);
+            call_user_func_array(array($this, $method . 'Handler'), $arguments);
         } catch (Exception $exception) {
             // Ignore
         }

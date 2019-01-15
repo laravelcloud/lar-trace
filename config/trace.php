@@ -8,3 +8,5 @@ return [
     'rate' => getenv('TRACE_RATE'),
     'service_name' => getenv('TRACE_SERVICE_NAME')
 ];
+
+
