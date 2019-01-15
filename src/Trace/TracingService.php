@@ -24,7 +24,7 @@ class TracingService
 
     public function createTracing($config) : Tracing
     {
-        $rate           = $config['rate'];
+        $rate           = (float)$config['rate'];
         $endpointUrl    = $config['endpoint_url'];
         $serviceName    = $config['service_name'] ?? null;
 
