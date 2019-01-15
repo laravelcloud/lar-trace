@@ -44,6 +44,12 @@ TRACE_SQL_BINDINGS=false
 ### Lumen 5.x
 ...
 
+
+## 链路追踪系统
+
+* [阿里云-链路追踪](https://www.aliyun.com/product/xtrace)
+* [zipkin](https://zipkin.io/)
+
 ## Contributing
 
 Dependencies are managed through composer:
@@ -64,7 +70,3 @@ $ vendor/bin/phpunit
 * [Bug Tracker](https://github.com/laravelcloud/lar-trace/issues)
 * [Code](https://github.com/laravelcloud/lar-trace)
 
-## product
-
-* [阿里云-链路追踪](https://www.aliyun.com/product/xtrace)
-* [zipkin](https://zipkin.io/)
