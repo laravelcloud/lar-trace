@@ -1,5 +1,5 @@
 {
-    "name": "LaravelCloud/lar-trace",
+    "name": "laravelcloud/lar-trace",
     "type": "library",
     "description": "lar-trace为laravel服务之间调用提供链路追踪",
     "authors": [
