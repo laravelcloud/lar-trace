@@ -1,13 +1,13 @@
 <?php
 
-namespace LaravelCloud\Trace\Trace;
+namespace LaravelCloud\Trace\TraceLaravel;
 
 use Zipkin\Span;
 use Zipkin\Tracing;
 use Zipkin\Endpoint;
 use Zipkin\TracingBuilder;
 use Zipkin\Reporters\Http;
-use Zipkin\Propagation\Map;
+use Zipkin\Propagation\Getter;
 use Zipkin\Samplers\PercentageSampler;
 
 class TracingService
@@ -44,33 +44,42 @@ class TracingService
         return $this->tracing;
     }
 
+    /**
+     * @return Tracing
+     */
     public function getTracing(): Tracing
     {
         return $this->tracing;
     }
 
-    public function createGlobalSpan($carrier): Span
+    /**
+     * @param $carrier
+     * @param Getter $getter
+     * @return Span
+     */
+    public function createGlobalSpan($carrier, Getter $getter): Span
     {
-        $carrier = $carrier ?: [];
-        $extractor = $this->getTracing()->getPropagation()->getExtractor(new Map());
+        $extractor = $this->getTracing()->getPropagation()->getExtractor($getter);
         $extractedContext = $extractor($carrier);
         $this->globalSpan = $this->getTracing()->getTracer()->nextSpan($extractedContext);
 
         return $this->globalSpan;
     }
 
+    /**
+     * @return Span
+     */
     public function getGlobalSpan(): Span
     {
         return $this->globalSpan;
     }
 
-    public function setGlobalTags($tags = [])
-    {
-        foreach ((array)$tags as $k => $v) {
-            $this->getGlobalSpan()->tag($k, $v);
-        }
-    }
-
+    /**
+     * new child
+     * @param $name
+     * @param array $tags
+     * @return Span
+     */
     public function newChild($name, $tags = []): Span
     {
         $tracer = $this->getTracing()->getTracer();
