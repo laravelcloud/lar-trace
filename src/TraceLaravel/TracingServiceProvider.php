@@ -38,12 +38,12 @@ class TracingServiceProvider extends ServiceProvider
             __DIR__ . '/../../config/trace.php' => config_path(static::$abstract . '.php'),
         ), 'config');
 
+        /**
+         * @var TracingService $service
+         */
         $service = app(TracingService::class);
 
         app()->terminating(function () use ($service) {
-            /**
-             * @var TracingService $service
-             */
             $service->getGlobalSpan()->annotate('request_finished', \Zipkin\Timestamp\now());
             $service->getGlobalSpan()->finish();
             $service->getTracing()->getTracer()->flush();

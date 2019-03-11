@@ -1,33 +1,22 @@
 <?php
+
 namespace LaravelCloud\Trace\TraceLaravel;
 
 use Exception;
+use Illuminate\Console\Events\CommandFinished;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Routing\Events\RouteMatched;
-use Illuminate\Database\Events\QueryExecuted;
-use Illuminate\Console\Events\CommandStarting;
-use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Arr;
 use LaravelCloud\Trace\Trace\TracingService;
 
 class TracingEventHandler
 {
-    /**
-     * Indicates if we should we add query bindings to the tracing.
-     *
-     * @var bool
-     */
-    private $sqlBindings;
-
-    /**
-     * @var TracingService
-     */
-    private $tracingService;
-
     /**
      * Maps event handler function to event names.
      *
@@ -48,6 +37,16 @@ class TracingEventHandler
 
         RequestHandled::class => 'request',
     );
+    /**
+     * Indicates if we should we add query bindings to the tracing.
+     *
+     * @var bool
+     */
+    private $sqlBindings;
+    /**
+     * @var TracingService
+     */
+    private $tracingService;
 
     /**
      * TracingEventHandler constructor.
@@ -55,8 +54,8 @@ class TracingEventHandler
      */
     public function __construct(array $config)
     {
-        $this->tracingService   = app(TracingService::class);
-        $this->sqlBindings      = isset($config['trace.sql_bindings'])
+        $this->tracingService = app(TracingService::class);
+        $this->sqlBindings = isset($config['trace.sql_bindings'])
             ? $config['trace.sql_bindings'] === true
             : false;
     }
@@ -77,19 +76,30 @@ class TracingEventHandler
      * Pass through the event and capture any errors.
      *
      * @param string $method
-     * @param array  $arguments
+     * @param array $arguments
      */
     public function __call($method, $arguments)
     {
-        if(!$method) {
-            return null;
+        if (!method_exists($this, $method . 'handler')) {
+            throw new Exception('Missing event handler:' . $method . 'handler');
         }
+
 
         try {
             call_user_func_array(array($this, $method . 'Handler'), $arguments);
         } catch (Exception $exception) {
             // Ignore
         }
+    }
+
+    /**
+     * Since Laravel 5.2
+     *
+     * @param RouteMatched $match
+     */
+    protected function routeMatchedHandler(RouteMatched $match)
+    {
+        $this->routerMatchedHandler($match->route);
     }
 
     /**
@@ -115,16 +125,6 @@ class TracingEventHandler
     }
 
     /**
-     * Since Laravel 5.2
-     *
-     * @param RouteMatched $match
-     */
-    protected function routeMatchedHandler(RouteMatched $match)
-    {
-        $this->routerMatchedHandler($match->route);
-    }
-
-    /**
      * Until Laravel 5.1
      *
      * @param $query
@@ -134,13 +134,12 @@ class TracingEventHandler
      */
     protected function queryHandler($query, $bindings, $time, $connectionName)
     {
-        $data = array('connectionName' => $connectionName);
-
-        if ($this->sqlBindings) {
-            $data['bindings'] = $bindings;
-        }
-
-        $this->tracingService->getGlobalSpan()->annotate(\Zipkin\Timestamp\now(), $query->sql);
+        $child = $this->tracingService->newChild('query_executed', [
+            'query.connectionName' => $connectionName,
+            'query.sql' => $query,
+            'query.bindings' => $this->sqlBindings ? json_encode($bindings) : '******'
+        ]);
+        $child->finish($time);
     }
 
     /**
@@ -150,13 +149,12 @@ class TracingEventHandler
      */
     protected function queryExecutedHandler(QueryExecuted $query)
     {
-        $data = array('connectionName' => $query->connectionName);
-
-        if ($this->sqlBindings) {
-            $data['bindings'] = $query->bindings;
-        }
-
-        $this->tracingService->getGlobalSpan()->annotate(\Zipkin\Timestamp\now(), $query->sql);
+        $child = $this->tracingService->newChild('query_executed', [
+            'query.connectionName' => $query->connectionName,
+            'query.sql' => $query->sql,
+            'query.bindings' => $this->sqlBindings ? json_encode($query->bindings) : '******'
+        ]);
+        $child->finish($query->time);
     }
 
     /**
@@ -166,7 +164,6 @@ class TracingEventHandler
      */
     protected function queueJobProcessedHandler(JobProcessed $event)
     {
-        return;
     }
 
     /**
@@ -176,7 +173,6 @@ class TracingEventHandler
      */
     protected function queueJobProcessingHandler(JobProcessing $event)
     {
-        return;
     }
 
     /**
@@ -186,7 +182,6 @@ class TracingEventHandler
      */
     protected function commandStartingHandler(CommandStarting $event)
     {
-        return;
     }
 
     /**
@@ -196,9 +191,11 @@ class TracingEventHandler
      */
     protected function commandFinishedHandler(CommandFinished $event)
     {
-        return;
     }
 
+    /**
+     * @param RequestHandled $event
+     */
     protected function requestHandler(RequestHandled $event)
     {
         $params = $event->request->except(config('trace.except'));
@@ -222,7 +219,5 @@ class TracingEventHandler
         foreach ((array)$params as $k => $v) {
             $span->tag($k, $v);
         }
-
-        return;
     }
 }
