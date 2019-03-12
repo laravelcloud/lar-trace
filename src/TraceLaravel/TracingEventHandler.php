@@ -151,7 +151,7 @@ class TracingEventHandler
             'query.bindings' => $this->sqlBindings ? json_encode($bindings) : '******',
             'query.time' => $time
         ]);
-        $child->start(\Zipkin\Timestamp\now());
+        $child->start(\Zipkin\Timestamp\now() - $time * 1000);
         $child->finish();
     }
 
