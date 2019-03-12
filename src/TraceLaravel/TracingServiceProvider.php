@@ -26,13 +26,6 @@ class TracingServiceProvider extends ServiceProvider
             __DIR__ . '/../../config/trace.php' => config_path(static::$abstract . '.php'),
         ), 'config');
 
-        /**
-         * @var TracingService $service
-         */
-        $service = app(TracingService::class);
-        $service->createTracing(config(static::$abstract));
-        $service->createGlobalSpan(request(), new RequestHeaders());
-
         $this->bindEvents($this->app);
     }
 
@@ -57,8 +50,16 @@ class TracingServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../../config/trace.php', static::$abstract);
 
-        $this->app->singleton(TracingService::class, function () {
-            return new TracingService();
+        $this->app->singleton(static::$abstract, function () {
+            return new TracingService(
+                config(static::$abstract),
+                request(),
+                new RequestHeaders()
+            );
+        });
+
+        $this->app->terminating(function () {
+            app(static::$abstract)->flush();
         });
     }
 
