@@ -41,11 +41,17 @@ class TracingEventHandler
      *
      * @var bool
      */
-    private $sqlBindings = false;
+    protected $sqlBindings;
+
     /**
      * @var TracingService
      */
-    private $tracingService;
+    protected $service;
+
+    /**
+     * @var string
+     */
+    protected $abstract = 'trace';
 
     /**
      * TracingEventHandler constructor.
@@ -53,8 +59,8 @@ class TracingEventHandler
      */
     public function __construct(array $config)
     {
-        $this->tracingService = app(TracingService::class);
-        $this->sqlBindings = ($config['sql_bindings'] ?? false) === true;
+        $this->service = app($this->abstract);
+        $this->sqlBindings = boolval($config['sql_bindings'] ?? false) === true;
     }
 
     /**
@@ -74,13 +80,9 @@ class TracingEventHandler
      *
      * @param string $method
      * @param array $arguments
-     */
-    /**
-     * @param $method
-     * @param $arguments
      * @throws TracingException
      */
-    public function __call($method, $arguments)
+    public function __call(string $method, array $arguments)
     {
         if (!method_exists($this, $method . 'handler')) {
             throw new TracingException('Missing event handler:' . $method . 'handler');
@@ -122,9 +124,10 @@ class TracingEventHandler
             $routeName = $route->uri();
         }
 
-        $span = $this->tracingService->getGlobalSpan();
+        $this->service->createTrace();
+        $span = $this->service->getTrace();
         $span->start(\Zipkin\Timestamp\now());
-        $span->setName((string)config('app.name'));
+        $span->setName($routeName);
         $span->setKind(\Zipkin\Kind\SERVER);
         $span->annotate(\Zipkin\Timestamp\now(), 'request_started');
         $span->tag('http.type', app()->runningInConsole() ? 'console' : 'http-request');
@@ -142,13 +145,13 @@ class TracingEventHandler
      */
     protected function queryHandler($query, $bindings, $time, $connectionName)
     {
-        $child = $this->tracingService->newChild('sql:' . $query, [
+        $child = $this->service->newChild($connectionName . ':' . $query, [
             'query.connectionName' => $connectionName,
             'query.sql' => $query,
             'query.bindings' => $this->sqlBindings ? json_encode($bindings) : '******',
             'query.time' => $time
         ]);
-        $child->start((int)(\Zipkin\Timestamp\now() - $query->time * 1000));
+        $child->start(\Zipkin\Timestamp\now() - $time * 1000);
         $child->finish();
     }
 
@@ -159,14 +162,15 @@ class TracingEventHandler
      */
     protected function queryExecutedHandler(QueryExecuted $query)
     {
-        $name = $query->connectionName . ':' . $query->connection->getDatabaseName();
-        $child = $this->tracingService->newChild($name, [
-            'query.connectionName' => $query->connectionName,
-            'query.database' => $query->connection->getDatabaseName(),
-            'query.sql' => $query->sql,
-            'query.bindings' => $this->sqlBindings ? json_encode($query->bindings) : '******',
-            'query.time' => $query->time
-        ]);
+        $child = $this->service->newChild(
+            $query->connectionName . ':' . $query->sql,
+            [
+                'query.connectionName' => $query->connectionName,
+                'query.database' => $query->connection->getDatabaseName(),
+                'query.sql' => $query->sql,
+                'query.bindings' => $this->sqlBindings ? json_encode($query->bindings) : '******',
+                'query.time' => $query->time
+            ]);
         $child->start((int)(\Zipkin\Timestamp\now() - $query->time * 1000));
         $child->finish();
     }
@@ -215,24 +219,21 @@ class TracingEventHandler
         $params = $event->request->except(config('trace.except'));
         $params = Arr::dot($params, 'http.query.');
 
-        $span = $this->tracingService->getGlobalSpan();
+        $span = $this->service->getTrace();
         $span->tag(\Zipkin\Tags\HTTP_HOST, $event->request->getHttpHost());
         $span->tag(\Zipkin\Tags\HTTP_METHOD, $event->request->method());
         $span->tag(\Zipkin\Tags\HTTP_PATH, $event->request->path());
         $span->tag(\Zipkin\Tags\HTTP_URL, $event->request->fullUrl());
         $span->tag(\Zipkin\Tags\HTTP_STATUS_CODE, $event->response->getStatusCode());
+
+        $span->tag('http.params', json_encode($params, JSON_UNESCAPED_UNICODE));
         if ($event->response->getStatusCode() >= 400) {
             $span->tag(\Zipkin\Tags\ERROR, $event->response->getContent());
         } else {
             $span->tag('http.response', $event->response->getContent());
         }
 
-        foreach ((array)$params as $k => $v) {
-            $span->tag($k, $v);
-        }
-
         $span->annotate('request_finished', \Zipkin\Timestamp\now());
         $span->finish();
-        $this->tracingService->getTracing()->getTracer()->flush();
     }
 }
