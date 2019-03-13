@@ -59,8 +59,10 @@ class TracingEventHandler
      */
     public function __construct(array $config)
     {
+        $sqlBindings = $config['sql_bindings'] ?? false;
+
         $this->service = app($this->abstract);
-        $this->sqlBindings = boolval($config['sql_bindings'] ?? false) === true;
+        $this->sqlBindings = ($sqlBindings === true || $sqlBindings === "true");
     }
 
     /**
@@ -148,10 +150,12 @@ class TracingEventHandler
         $child = $this->service->newChild($connectionName . ':' . $query, [
             'query.connectionName' => $connectionName,
             'query.sql' => $query,
-            'query.bindings' => $this->sqlBindings ? json_encode($bindings) : '******',
             'query.time' => $time
         ]);
         $child->start(\Zipkin\Timestamp\now() - $time * 1000);
+        if ($this->sqlBindings) {
+            $child->tag('query.bindings', json_encode($bindings));
+        }
         $child->finish();
     }
 
@@ -168,10 +172,12 @@ class TracingEventHandler
                 'query.connectionName' => $query->connectionName,
                 'query.database' => $query->connection->getDatabaseName(),
                 'query.sql' => $query->sql,
-                'query.bindings' => $this->sqlBindings ? json_encode($query->bindings) : '******',
                 'query.time' => $query->time
             ]);
         $child->start((int)(\Zipkin\Timestamp\now() - $query->time * 1000));
+        if ($this->sqlBindings) {
+            $child->tag('query.bindings', json_encode($query->bindings));
+        }
         $child->finish();
     }
 
